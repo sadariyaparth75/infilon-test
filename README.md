@@ -1,35 +1,70 @@
-# TenForce Test and Taste – Solar System console app
+# Solar System Console App
 
-A .NET console application that reads data from the [Solar System OpenData API](https://api.le-systeme-solaire.net/en/) and writes these lists to the console and to CSV files:
+A .NET console application that reads data from the [Solar System OpenData API](https://api.le-systeme-solaire.net/en/) and writes three lists to the console and to CSV files:
 
-1. The planets that have at least one moon, with the **average temperature of their moons**.
-2. All moons and their mass.
-3. All planets and their moons.
+1. **Planets with moons and the average temperature of their moons** (new in this exercise)
+2. All moons and their mass
+3. All planets and their moons
 
-## Requirements
+Built for the TenForce "Test and Taste" developer exercise, which extends an existing project.
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) (the project targets `net10.0`)
-- A free API key from https://api.le-systeme-solaire.net/generatekey.html
+## Contents
 
-## Setting the API key
+- [Getting started](#getting-started)
+- [Configuring the API key](#configuring-the-api-key)
+- [Output](#output)
+- [How it works](#how-it-works)
+- [Design decisions](#design-decisions)
+- [Changes compared to the original project](#changes-compared-to-the-original-project)
+- [Known limitations](#known-limitations)
+- [Project structure](#project-structure)
 
-Since version 2.0.0 the API requires an API key on every request. The key is **not** stored in the repository. The application reads the `SOLAR_SYSTEM_API_KEY` setting from three places. If it is set in more than one, the first one in this list wins:
+## Getting started
 
-1. The environment variable `SOLAR_SYSTEM_API_KEY`
-2. .NET user secrets (key `SOLAR_SYSTEM_API_KEY`)
-3. `Test-Taste-Console-Application/appsettings.json`, which is excluded from git
+### Prerequisites
 
-**Option A – appsettings.json (simplest):**
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- A free API key from the [API key page](https://api.le-systeme-solaire.net/generatekey.html). The page is in French; use the "En" switch for English.
 
-Copy the template and put your key in it:
+### Run
+
+```bash
+git clone https://github.com/sadariyaparth75/infilon-test.git
+cd infilon-test
+
+# 1. Add your API key (see the next section for other options)
+cp Test-Taste-Console-Application/appsettings.example.json Test-Taste-Console-Application/appsettings.json
+#    then replace <YOUR_API_KEY> in appsettings.json with your key
+
+# 2. Run
+dotnet run --project Test-Taste-Console-Application
+```
+
+In Visual Studio, open `Test-Taste-Console-Application.sln` in the repository root, add the key as described above, and press F5.
+
+## Configuring the API key
+
+Since version 2.0.0 the API rejects requests without an API key. The key is never stored in source code or in the repository. The application reads the setting `SOLAR_SYSTEM_API_KEY` from three places. If it is set in more than one, the first one in this list wins:
+
+| Priority | Source | Typical use |
+|---|---|---|
+| 1 | Environment variable `SOLAR_SYSTEM_API_KEY` | A single session, CI |
+| 2 | .NET user secrets | Developer machine, outside the project folder |
+| 3 | `Test-Taste-Console-Application/appsettings.json` | Simplest local setup |
+
+### Option A: appsettings.json
+
+Copy the template and put your key in it.
+
+PowerShell:
 
 ```powershell
-# PowerShell
 Copy-Item Test-Taste-Console-Application/appsettings.example.json Test-Taste-Console-Application/appsettings.json
 ```
 
+bash:
+
 ```bash
-# bash
 cp Test-Taste-Console-Application/appsettings.example.json Test-Taste-Console-Application/appsettings.json
 ```
 
@@ -39,45 +74,99 @@ cp Test-Taste-Console-Application/appsettings.example.json Test-Taste-Console-Ap
 }
 ```
 
-`appsettings.json` is listed in `.gitignore`, so the key is never committed. Only the template `appsettings.example.json` is in the repository.
+`appsettings.json` is listed in `.gitignore`, so the key is never committed. Only the template `appsettings.example.json` is part of the repository.
 
-**Option B – user secrets (outside the project folder):**
+### Option B: user secrets
 
 ```bash
 dotnet user-secrets set SOLAR_SYSTEM_API_KEY <YOUR_API_KEY> --project Test-Taste-Console-Application
 ```
 
-User secrets are stored in your user profile (`%APPDATA%\Microsoft\UserSecrets\` on Windows, `~/.microsoft/usersecrets/` on Linux/macOS), outside the repository.
+User secrets are stored in your user profile (`%APPDATA%\Microsoft\UserSecrets\` on Windows, `~/.microsoft/usersecrets/` on Linux and macOS).
 
-**Option C – environment variable (for a single session or CI):**
+### Option C: environment variable
+
+PowerShell:
 
 ```powershell
-# PowerShell
 $env:SOLAR_SYSTEM_API_KEY = "<YOUR_API_KEY>"
 ```
 
+bash:
+
 ```bash
-# bash
 export SOLAR_SYSTEM_API_KEY="<YOUR_API_KEY>"
 ```
 
-If no key is found, the application stops with an instruction. If the API rejects the key (HTTP 401/403), that is reported as well.
+### When the key is missing or wrong
 
-## Running
+- **No key found:** the application stops before calling the API, explains how to set the key, and exits with code 1.
+- **Key rejected** (HTTP 401 for a missing key, 403 for an invalid one): the application reports that the key was rejected and exits with code 1.
 
-```bash
-dotnet run --project Test-Taste-Console-Application
+## Output
+
+### Console
+
+The application reports each step while it runs:
+
+```
+Loading data from the Solar System OpenData API...
+Data loaded: 8 planets and 479 moons.
+
+Writing the planets with moons and their average moon temperature...
+--------------------+---------------+------------------------------+------------------------------+------------------------------
+Planet's Id         |Total Moons    |Moons With Temperature Data   |Average Moon Temperature      |Planet's Average Temperature
+--------------------+---------------+------------------------------+------------------------------+------------------------------
+Uranus              |29             |0                             |n/a                           |76.0 K / -197.1 C
+Neptune             |16             |0                             |n/a                           |55.0 K / -218.1 C
+Jupiter             |115            |0                             |n/a                           |165.0 K / -108.1 C
+Mars                |2              |0                             |n/a                           |210.0 K / -63.1 C
+Saturne             |293            |0                             |n/a                           |134.0 K / -139.1 C
+Terre               |1              |0                             |n/a                           |288.0 K / 14.9 C
+--------------------+---------------+------------------------------+------------------------------+------------------------------
+Note: the API reports no temperature (avgTemp = 0 K) for any of these moons, so their average is shown as n/a.
+
+Writing all moons and their mass...
+Writing all planets and their moons...
+Writing the lists to CSV files...
+Done.
 ```
 
-The lists are printed to the console and written as CSV files to a `FileOutput` folder in the current directory (it is created if needed and excluded from git):
+Planet ids are the API's own (French) ids, for example `terre` for Earth. Mercury and Venus are not in the first list because they have no moons. The `n/a` values are explained under [Known limitations](#known-limitations).
+
+### CSV files
+
+The same lists are written to a `FileOutput` folder in the current directory. The folder is created when needed and is excluded from git.
 
 | File | Content |
 |---|---|
-| `AllPlanetsAndTheirAverageMoonTemperature.csv` | Planets with at least one moon, moon count, moons with temperature data, average moon temperature and planet temperature (Kelvin; an empty cell means unknown) |
+| `AllPlanetsAndTheirAverageMoonTemperature.csv` | Planets with at least one moon: moon count, moons with temperature data, average moon temperature and the planet's own temperature, in Kelvin. An empty cell means unknown. |
 | `AllMoonsAndTheirMass.csv` | Every moon, the body it orbits, and its mass |
-| `AllPlanetsAndTheirMoons.csv` | One row per planet/moon pair (planets without moons have an empty moon column) |
+| `AllPlanetsAndTheirMoons.csv` | One row per planet and moon pair. Planets without moons have one row with an empty moon column. |
 
-The run is split into three steps: loading the data, writing to the screen, and writing the files. If loading fails, the run stops. A failure while writing to the screen does not prevent the files from being written. Any failure sets exit code 1.
+The files are UTF-8 with a byte order mark, so spreadsheet tools show accented names correctly. Numbers always use a decimal point.
+
+## How it works
+
+```
+Program.cs              configuration, dependency injection, the three steps
+   |
+ScreenOutputService     FileOutputService            output
+   |
+PlanetService           MoonService                  data handling (cached per run)
+   |
+HttpClientService                                    data access (API key header, errors)
+   |
+api.le-systeme-solaire.net
+```
+
+A run has three steps:
+
+1. **Load the data.** Two API requests in total: one for the planets, one for all moons. If loading fails, the run stops, because there is nothing to write.
+2. **Write to the console.** A failure here is reported but does not stop step 3.
+3. **Write the CSV files.**
+
+Any failure is logged with log4net and sets exit code 1.
 
 ## Design decisions
 
@@ -85,46 +174,60 @@ The run is split into three steps: loading the data, writing to the screen, and 
 
 | Change | Why |
 |---|---|
-| `Moon.AverageTemperature` (`float?`, Kelvin) and `Moon.PlanetId` added | The system had no notion of temperature. The value is **nullable** because the API reports `avgTemp = 0` when the temperature is unknown. 0 K is physically impossible, so it is treated as "no data" rather than a real value. |
-| `Planet.AverageMoonGravity` replaced by `Planet.AverageMoonTemperature` (`float?`) | The old property was a stub that always returned `0`. The new one averages only the moons with a known temperature (unknown values would drag the average to 0) and returns `null` when no moon has data. |
+| `Moon.AverageTemperature` (`float?`, Kelvin) and `Moon.PlanetId` added | The system had no notion of temperature. The value is nullable because the API reports `avgTemp = 0` when the temperature is unknown. 0 K (absolute zero) is physically impossible, so it is treated as "no data" rather than as a real value. |
+| `Planet.AverageMoonGravity` replaced by `Planet.AverageMoonTemperature` (`float?`) | The old property was a stub that always returned `0`. The new one averages only the moons with a known temperature, because unknown values would drag the average towards 0. It returns `null` when no moon has data. |
 | `Planet.MoonsWithKnownTemperatureCount` and `Planet.AverageTemperature` added | An average is only meaningful if you know how many values it is based on. The planet's own temperature is shown as a reference. |
-| `Planet` now receives its moons via the constructor | Moons are loaded in a separate bulk request (see below), so the planet no longer depends on the DTO carrying fully loaded moons. |
+| `Planet` receives its moons through the constructor | Moons are loaded in a separate bulk request, so a planet no longer depends on its DTO carrying fully loaded moons. |
 
 ### API interface
 
 | Change | Why |
 |---|---|
-| One bulk request for all moons (`filter[]=bodyType,eq,Moon`) with `avgTemp` and `aroundPlanet` | The original code sent **one request per moon** (400+ requests, repeated for every output list). The app now needs **2 requests in total**. Planet → moon references are resolved in memory by id. |
-| `bodyType,eq,Moon` instead of `aroundPlanet,gt,null` | The old filter silently returned only 336 of the 479 moons. |
-| Nested fields (`massValue`, `planet`) listed explicitly in `data=` | The API returns empty nested objects otherwise. |
-| `avgTemp` added to the planet request | Used as reference value in the output. |
-| Data is loaded once and cached in the (singleton) services | Every output list reuses the same data. |
-| Central `HttpClientService.GetFromJson<T>` with error handling | Non-success responses now raise a clear error instead of silently returning an empty list, which looked like "no planets found". A rejected key (401/403) gets a dedicated message. |
-| `Authorization: Bearer <key>` header from configuration | Required since API v2.0.0. The key is never stored in source code. |
+| One bulk request for all moons, including `avgTemp` and `aroundPlanet` | The original code sent one request per moon (456 moons), and repeated that for each list that reads planets: about 915 requests per run. The application now needs 2. Planets and moons are matched in memory by id. |
+| Filter `bodyType,eq,Moon` instead of `aroundPlanet,gt,null` | The old filter silently returned only 336 of the 479 moons. |
+| Nested fields (`massValue`, `planet`) listed explicitly in `data=` | Otherwise the API returns empty nested objects. |
+| `semimajorAxis` instead of `semiMajorAxis` | Field names in `data=` are case-sensitive. With the wrong spelling the value was always `0`. |
+| `avgTemp` added to the planet request | Shown as a reference value next to the moon average. |
+| Data loaded once per run and cached in the (singleton) services | All lists use the same data, and the API is not called again for each list. |
+| One `HttpClientService.GetFromJson<T>` helper with error handling | A failed request raises a clear error instead of silently returning an empty list that looked like "no planets found". |
+| `Authorization: Bearer <key>` header, key read from configuration | Required since API v2.0.0. |
 
-### Bugs fixed
+## Changes compared to the original project
 
-- The original project did not compile: `Program.cs` contained `$""{...}""` in the `Debug.WriteLine` call.
-- The original sent no `Authorization` header, so since API v2.0.0 every request was rejected and the lists came out empty.
-- The semi-major axis was always `0`. The `data=` field names are case-sensitive, and the API field is `semimajorAxis`, not `semiMajorAxis`. It is now also a `double`, because a `float` cannot hold values like 4,498,396,441 km exactly.
-- The file output described in the assignment was missing. `FileOutputService` now writes the three lists as CSV.
-- The average temperature list now only shows planets that have at least one moon.
-- The log4net configuration is resolved next to the executable, so logging also works when the app is started from another folder.
-- Retargeted from the unsupported `net5.0` to `net10.0` (LTS), with up-to-date packages. The build has 0 warnings.
+- **Build fixed.** `Program.cs` did not compile because of `$""{...}""` in a `Debug.WriteLine` call.
+- **API key added.** The original sent no `Authorization` header, so every request was rejected and every list came out empty.
+- **New list** of planets with moons and the average temperature of their moons.
+- **File output added.** The assignment describes file output, and the original already contained the CSV file names, but the output itself was missing.
+- **Semi-major axis fixed.** It was always `0` because of the field name casing. It is now a `double`, because a `float` cannot hold values like 4,498,396,441 km exactly.
+- **All moons loaded.** 479 instead of 336.
+- **Progress messages and error handling** for every step.
+- **Logging configuration** is read from the application folder, so logging also works when the application is started from another folder.
+- **Retargeted** from the unsupported `net5.0` to `net10.0` (LTS), with up-to-date packages. The build has no warnings.
 
-## A note on the data
+## Known limitations
 
-At the time of writing, the API returns `avgTemp = 0` (unknown) for **every** moon. The average moon temperature is therefore shown as `n/a`, with the number of moons that have data (`0`), plus an explanatory note. As soon as the dataset contains moon temperatures, the averages appear without any code change. Planets do have temperatures; these are shown in a separate column.
+- **No moon temperatures in the dataset.** At the time of writing the API returns `avgTemp = 0` (unknown) for every moon, so the average moon temperature is `n/a` for every planet. The output says so explicitly, and shows the planet's own temperature separately instead of substituting it. When the dataset gains moon temperatures, the averages appear without any code change.
+- **Unknown masses are shown as 0.** The API has no mass for 275 of the 479 moons. The moons and mass list shows those as `0`, as the original project did.
+- **Key press at the end.** The application waits for a key press after `Done.` so the console window stays open. When input is redirected (for example in scripts or CI) this step fails after all output has been written.
+- **Synchronous HTTP calls.** With only two requests per run, async code throughout every layer added little. It is the first thing to change if the number of calls grows.
 
 ## Project structure
 
 ```
-Test-Taste-Console-Application/
-├── Configuration/        API settings (API key resolution)
-├── Constants/            URIs, output strings, messages
-├── Domain/
-│   ├── DataTransferObjects/   Shapes of the API responses (data access)
-│   ├── Objects/               Domain objects: Planet, Moon (data objects)
-│   └── Services/              HTTP access, planet/moon services, screen and file output (data handling)
-└── Utilities/            Console writer, CSV writer, logger, temperature helpers
+.
+├── Test-Taste-Console-Application.sln
+├── docs/
+│   └── presentation.html          Slides for the project walkthrough and demo
+└── Test-Taste-Console-Application/
+    ├── Program.cs                 Entry point: configuration, DI, the three steps
+    ├── appsettings.example.json   Template for the git-ignored appsettings.json
+    ├── Configuration/             API key resolution (ApiSettings)
+    ├── Constants/                 URIs, output strings, messages
+    ├── Domain/
+    │   ├── DataTransferObjects/   Shapes of the API responses (data access)
+    │   ├── Objects/               Planet and Moon (data objects)
+    │   └── Services/              HTTP access, planet and moon services, console and file output (data handling)
+    └── Utilities/                 Console writer, CSV writer, logger, temperature helpers
 ```
+
+The presentation is a single HTML file: open `docs/presentation.html` in a browser and use the arrow keys. Press N for speaker notes.
