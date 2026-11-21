@@ -1,8 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Text;
-using Newtonsoft.Json;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Test_Taste_Console_Application.Constants;
 using Test_Taste_Console_Application.Domain.DataTransferObjects;
 using Test_Taste_Console_Application.Domain.DataTransferObjects.JsonObjects;
@@ -16,76 +14,72 @@ namespace Test_Taste_Console_Application.Domain.Services
     public class PlanetService : IPlanetService
     {
         private readonly HttpClientService _httpClientService;
+        private readonly IMoonService _moonService;
 
-        public PlanetService(HttpClientService httpClientService)
+        //The planets are loaded once per run; every output list reuses the same data.
+        private IReadOnlyCollection<Planet> _cachedPlanets;
+
+        public PlanetService(HttpClientService httpClientService, IMoonService moonService)
         {
             _httpClientService = httpClientService;
+            _moonService = moonService;
         }
 
         public IEnumerable<Planet> GetAllPlanets()
         {
-            var allPlanetsWithTheirMoons = new Collection<Planet>();
-
-            var response = _httpClientService.Client
-                .GetAsync(UriPath.GetAllPlanetsWithMoonsQueryParameters)
-                .Result;
-
-            //If the status code isn't 200-299, then the function returns an empty collection.
-            if (!response.IsSuccessStatusCode)
+            if (_cachedPlanets != null)
             {
-                Logger.Instance.Warn($"{LoggerMessage.GetRequestFailed}{response.StatusCode}");
-                return allPlanetsWithTheirMoons;
+                return _cachedPlanets;
             }
-
-            var content = response.Content.ReadAsStringAsync().Result;
 
             //The JSON converter uses DTO's, that can be found in the DataTransferObjects folder, to deserialize the response content.
-            var results = JsonConvert.DeserializeObject<JsonResult<PlanetDto>>(content);
+            var results = _httpClientService.GetFromJson<JsonResult<PlanetDto>>(UriPath.GetAllPlanetsWithMoonsQueryParameters);
+            var planetDtos = results?.Bodies ?? Enumerable.Empty<PlanetDto>();
 
-            //The JSON converter can return a null object. 
-            if (results == null) return allPlanetsWithTheirMoons;
+            //All moons come from ONE bulk request. Looking them up by id replaces the old loop that sent
+            //one request per moon (hundreds of requests, executed again for every output list).
+            var moonsById = _moonService.GetAllMoons()
+                .GroupBy(moon => moon.Id, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-            //If the planet doesn't have any moons, then it isn't added to the collection.
-            foreach (var planet in results.Bodies)
-            {
-                if(planet.Moons != null)
-                {
-                    var newMoonsCollection = new Collection<MoonDto>();
-                    foreach (var moon in planet.Moons)
-                    {
-                        var moonResponse = _httpClientService.Client
-                            .GetAsync(UriPath.GetMoonByIdQueryParameters + moon.URLId)
-                            .Result;
-                        var moonContent = moonResponse.Content.ReadAsStringAsync().Result;
-                        newMoonsCollection.Add(JsonConvert.DeserializeObject<MoonDto>(moonContent));
-                    }
-                    planet.Moons = newMoonsCollection;
+            //Every planet is added, also planets without moons; the output services decide what to show.
+            _cachedPlanets = planetDtos
+                .Where(planetDto => planetDto != null)
+                .Select(planetDto => new Planet(planetDto, ResolveMoons(planetDto, moonsById)))
+                .ToList()
+                .AsReadOnly();
 
-                }
-                allPlanetsWithTheirMoons.Add(new Planet(planet));
-            }
-
-            return allPlanetsWithTheirMoons;
+            return _cachedPlanets;
         }
 
-        private static string RemoveDiacritics(string text)
+        ///<summary>
+        /// Turns the moon references of a planet (name + rel URL) into full moon objects.
+        ///</summary>
+        private static IEnumerable<Moon> ResolveMoons(PlanetDto planetDto, IDictionary<string, Moon> moonsById)
         {
-            var normalizedString = text.Normalize(NormalizationForm.FormD);
-            var stringBuilder = new StringBuilder(capacity: normalizedString.Length);
+            var moons = new List<Moon>();
 
-            for (int i = 0; i < normalizedString.Length; i++)
+            foreach (var moonReference in planetDto.Moons ?? Enumerable.Empty<MoonDto>())
             {
-                char c = normalizedString[i];
-                var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
-                if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+                if (moonReference == null)
                 {
-                    stringBuilder.Append(c);
+                    continue;
                 }
+
+                var moonId = moonReference.URLId ?? moonReference.Id;
+                if (moonId != null && moonsById.TryGetValue(moonId, out var moon))
+                {
+                    moons.Add(moon);
+                    continue;
+                }
+
+                //The moon is kept so the count matches what the API reports for the planet, but it has no mass or temperature data.
+                Logger.Instance.Warn($"{LoggerMessage.MoonNotFound}{moonId}");
+                moonReference.Id = moonId;
+                moons.Add(new Moon(moonReference));
             }
 
-            return stringBuilder
-                .ToString()
-                .Normalize(NormalizationForm.FormC);
+            return moons;
         }
     }
 }

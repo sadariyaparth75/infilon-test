@@ -21,10 +21,18 @@ namespace Test_Taste_Console_Application.Domain.DataTransferObjects
 
         //The path of the specific moon
         [JsonProperty("rel")] public string Rel { get; set; }
-        public string URLId { get => Rel.Split('/').Last(); }
 
-        //The path to the nested property is created by using a dot. 
+        //The id at the end of the rel URL (e.g. ".../bodies/lune" -> "lune"). Null when the rel isn't part of the response.
+        public string URLId { get => Rel?.TrimEnd('/').Split('/').Last(); }
+
+        //The path to the nested property is created by using a dot.
         [JsonProperty("mass.massValue")] public float MassValue { get; set; }
         [JsonProperty("mass.massExponent")] public float MassExponent { get; set; }
+
+        //Average temperature in Kelvin. The API uses 0 when the temperature is unknown.
+        [JsonProperty("avgTemp")] public float AvgTemp { get; set; }
+
+        //The id of the planet (or dwarf planet / asteroid) the moon orbits.
+        [JsonProperty("aroundPlanet.planet")] public string AroundPlanetId { get; set; }
     }
 }
