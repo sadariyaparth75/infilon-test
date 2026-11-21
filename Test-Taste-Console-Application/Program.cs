@@ -105,6 +105,7 @@ namespace Test_Taste_Console_Application
             }
 
             Console.WriteLine(OutputString.Done);
+            Console.ReadKey();
         }
 
         private static void ReportFailure(string loggerMessage, string userMessage, Exception exception)
