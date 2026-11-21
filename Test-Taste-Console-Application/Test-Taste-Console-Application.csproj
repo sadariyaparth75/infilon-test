@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net5.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <RootNamespace>Test_Taste_Console_Application</RootNamespace>
-    </PropertyGroup>
+      <UserSecretsId>1c900a20-97e9-491b-9c55-8efaeda3493b</UserSecretsId>
+  </PropertyGroup>
 
     <ItemGroup>
       <None Remove="FileOutput\" />
@@ -12,12 +13,19 @@
     </ItemGroup>
     <ItemGroup>
       <PackageReference Include="log4net" Version="3.6.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration" Version="11.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="11.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="11.0.0" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
       <PackageReference Include="Microsoft.Extensions.Http" Version="11.0.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 <None Update="log4net.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+      <!-- Holds the API key locally; excluded from git (see appsettings.example.json for the template). -->
+      <None Update="appsettings.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
     <ItemGroup>

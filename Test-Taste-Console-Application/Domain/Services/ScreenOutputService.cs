@@ -143,46 +143,58 @@ namespace Test_Taste_Console_Application.Domain.Services
              */
         }
 
-        public void OutputAllPlanetsAndTheirAverageMoonGravityToConsole()
+        public void OutputAllPlanetsAndTheirAverageMoonTemperatureToConsole()
         {
             //The function works the same way as the PrintAllPlanetsAndTheirMoonsToConsole function. You can find more comments there.
-            var planets = _planetService.GetAllPlanets().ToArray();
-            if (!planets.Any())
+            //Only planets with at least one moon are part of this list.
+            var planetsWithMoons = _planetService.GetAllPlanets().Where(planet => planet.HasMoons()).ToArray();
+            if (!planetsWithMoons.Any())
             {
-                Console.WriteLine(OutputString.NoMoonsFound);
+                Console.WriteLine(OutputString.NoPlanetsWithMoonsFound);
                 return;
             }
 
-            var columnSizes = new[] { 20, 30 };
+            //Besides the average, the list shows how many moons have temperature data (so the average can be judged)
+            //and the planet's own temperature as a reference.
+            var columnSizes = new[] { 20, 15, 30, 30, 30 };
             var columnLabels = new[]
             {
-                OutputString.PlanetId, OutputString.PlanetMoonAverageGravity
+                OutputString.PlanetId, OutputString.TotalMoons, OutputString.MoonsWithTemperatureData,
+                OutputString.PlanetMoonAverageTemperature, OutputString.PlanetAverageTemperature
             };
-
 
             ConsoleWriter.CreateHeader(columnLabels, columnSizes);
 
-            foreach(Planet planet in planets)
+            foreach (Planet planet in planetsWithMoons)
             {
-                if(planet.HasMoons())
-                {
-                    ConsoleWriter.CreateText(new string[] { $"{planet.Id}", $"{planet.AverageMoonGravity}" }, columnSizes);
-                }
-                else
-                {
-                    ConsoleWriter.CreateText(new string[] { $"{planet.Id}", $"-" }, columnSizes);
-                }
+                ConsoleWriter.CreateText(
+                    new[]
+                    {
+                        CultureInfoUtility.TextInfo.ToTitleCase(planet.Id),
+                        planet.Moons.Count.ToString(),
+                        planet.MoonsWithKnownTemperatureCount.ToString(),
+                        TemperatureUtility.Format(planet.AverageMoonTemperature),
+                        TemperatureUtility.Format(planet.AverageTemperature)
+                    },
+                    columnSizes);
             }
 
             ConsoleWriter.CreateLine(columnSizes);
+
+            //Tell the user why the averages are missing, instead of leaving a column full of n/a unexplained.
+            if (planetsWithMoons.All(planet => planet.AverageMoonTemperature == null))
+            {
+                Console.WriteLine(OutputString.NoMoonTemperatureData);
+            }
+
             ConsoleWriter.CreateEmptyLines(2);
-            
+
             /*
-                --------------------+--------------------------------------------------
-                Planet's Number     |Planet's Average Moon Gravity
-                --------------------+--------------------------------------------------
-                1                   |0.0f
-                --------------------+--------------------------------------------------
+                --------------------+---------------+------------------------------+------------------------------+------------------------------
+                Planet's Id         |Total Moons    |Moons With Temperature Data   |Average Moon Temperature      |Planet's Average Temperature
+                --------------------+---------------+------------------------------+------------------------------+------------------------------
+                Terre               |1              |0                             |n/a                           |288.0 K / 14.9 C
+                --------------------+---------------+------------------------------+------------------------------+------------------------------
             */
         }
     }
