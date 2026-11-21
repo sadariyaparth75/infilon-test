@@ -81,6 +81,31 @@
   .tag.green { background: rgba(111,220,140,.15); color: var(--green); }
   .tag.sun { background: rgba(245,165,36,.15); color: var(--sun); }
 
+  /* Before / after code comparison */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+  .compare + .compare { margin-top: 18px; }
+  .pane { display: flex; flex-direction: column; min-width: 0; }
+  .pane-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .pane-head .tag { margin: 0; }
+  .pane-head .file { font-family: var(--mono); font-size: 14px; color: var(--muted); }
+  .pane pre { flex: 1; font-size: 12px; line-height: 1.45; padding: 12px 16px; }
+  .pane.before pre { border-color: rgba(255,122,122,.45); }
+  .pane.after pre { border-color: rgba(111,220,140,.45); }
+  .caption { font-size: 15px; color: var(--muted); margin: 8px 0 0; line-height: 1.4; }
+  .caption b { color: var(--text); }
+  /* Changed lines / fragments, like a diff */
+  pre .del { background: rgba(255,122,122,.16); color: #ffb3b3; border-radius: 3px; }
+  pre .add { background: rgba(111,220,140,.14); color: #b9f5c9; border-radius: 3px; }
+  pre .del.line, pre .add.line { display: inline-block; min-width: 100%; }
+  .stack .pane + .pane { margin-top: 14px; }
+  table.tight td { padding: 6px 14px; }
+  pre.term.sm { font-size: 11.5px; line-height: 1.35; padding: 10px 16px; }
+  .out-top { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; margin-bottom: 14px; }
+  .files { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+  .files table { font-size: 15px; }
+  .files td, .files th { padding: 6px 10px; }
+  .files td:first-child { font-family: var(--mono); font-size: 13.5px; white-space: nowrap; color: #ffd48a; }
+
   /* Architecture diagram */
   .arch { display: grid; grid-template-columns: 1fr 300px; gap: 26px; flex: 1; }
   .layers { display: flex; flex-direction: column; gap: 10px; }
@@ -199,6 +224,102 @@
     </aside>
   </section>
 
+  <!-- 3b. Changes at a glance -->
+  <section class="slide">
+    <p class="kicker">Before → After</p>
+    <h2>What changed, file by file</h2>
+    <div class="files">
+      <div class="card">
+        <h3>Modified (original files)</h3>
+        <table>
+          <tr><td>Program.cs</td><td>Build fix, config loading, 3 steps with progress</td></tr>
+          <tr><td>HttpClientService.cs</td><td>Bearer key header, one request helper with errors</td></tr>
+          <tr><td>PlanetService.cs</td><td>No per-moon requests; moons matched in memory</td></tr>
+          <tr><td>MoonService.cs</td><td>One bulk request with temperature, cached</td></tr>
+          <tr><td>Planet.cs / Moon.cs</td><td>Temperature added; gravity stub replaced</td></tr>
+          <tr><td>MoonDto / PlanetDto</td><td><code>avgTemp</code>, parent planet, <code>semimajorAxis</code></td></tr>
+          <tr><td>ScreenOutputService.cs</td><td>New temperature list, only planets with moons</td></tr>
+          <tr><td>UriPath.cs</td><td>Corrected and extended API queries</td></tr>
+          <tr><td>Constants/*.cs</td><td>Messages and setting names</td></tr>
+          <tr><td>.csproj</td><td><code>net5.0</code> → <code>net10.0</code>, config packages</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3>New files</h3>
+        <table>
+          <tr><td>ApiSettings.cs</td><td>Finds the API key in configuration</td></tr>
+          <tr><td>TemperatureUtility.cs</td><td>0 K → unknown; Kelvin / Celsius display</td></tr>
+          <tr><td>FileOutputService.cs</td><td>Writes the three lists as CSV</td></tr>
+          <tr><td>IFileOutputService.cs</td><td>Interface for the file output</td></tr>
+          <tr><td>CsvWriter.cs</td><td>Small CSV helper (quoting, UTF-8)</td></tr>
+          <tr><td>appsettings.example.json</td><td>Template for the git-ignored key file</td></tr>
+        </table>
+        <p class="caption" style="margin-top:16px"><b>24 files</b> · 610 lines added · 139 removed. Untouched: <code>JsonPathConverter</code>, <code>ConsoleWriter</code>, <code>Logger</code>, interfaces for planets and moons.</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>This is the map for the next slides. Each of the following "Before → After" slides zooms into one row.</li>
+        <li>I kept the original structure (services, DTOs, constants) and added to it, so the diff stays reviewable.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 3c. Before/after: making it run -->
+  <section class="slide">
+    <p class="kicker">Before → After</p>
+    <h2>Making it build and run</h2>
+    <div class="compare">
+      <div class="pane before">
+        <div class="pane-head"><span class="tag red">Before</span><span class="file">Program.cs (catch block)</span></div>
+<pre>System.Diagnostics.Debug.WriteLine(
+<span class="del line">$""{ExceptionMessage.ScreenOutputOperationFailed}{exception.Message}"");</span></pre>
+        <p class="caption"><b>Syntax error:</b> <code>$""…""</code> is not valid C#, so the project did not build.</p>
+      </div>
+      <div class="pane after">
+        <div class="pane-head"><span class="tag green">After</span><span class="file">Program.cs (ReportFailure)</span></div>
+<pre>System.Diagnostics.Debug.WriteLine(
+<span class="add line">    $"{userMessage}{exception.Message}");</span></pre>
+        <p class="caption">One shared <code>ReportFailure</code> method for all three steps.</p>
+      </div>
+    </div>
+    <div class="compare">
+      <div class="pane before">
+        <div class="pane-head"><span class="tag red">Before</span><span class="file">HttpClientService.cs</span></div>
+<pre><span class="k">public</span> HttpClientService(HttpClient client)
+{
+    <span class="c">//The HTTP client is configured in the constructor.</span>
+    Client = client;
+    Client.BaseAddress = <span class="k">new</span> Uri(UriPath.BaseUri);
+    Client.DefaultRequestHeaders.Accept.Add(<span class="k">new</span>
+        MediaTypeWithQualityHeaderValue(HttpClientSettings.JsonType));
+}</pre>
+        <p class="caption"><b>No <code>Authorization</code> header:</b> since API v2.0.0 every request gets HTTP 401.</p>
+      </div>
+      <div class="pane after">
+        <div class="pane-head"><span class="tag green">After</span><span class="file">HttpClientService.cs</span></div>
+<pre><span class="k">public</span> HttpClientService(HttpClient client, <span class="add">ApiSettings apiSettings</span>)
+{
+    Client = client;
+    Client.BaseAddress = <span class="k">new</span> Uri(UriPath.BaseUri);
+    Client.DefaultRequestHeaders.Accept.Add(<span class="k">new</span>
+        MediaTypeWithQualityHeaderValue(HttpClientSettings.JsonType));
+<span class="add line">    Client.DefaultRequestHeaders.Authorization =</span>
+<span class="add line">        new AuthenticationHeaderValue(</span>
+<span class="add line">            HttpClientSettings.BearerScheme, apiSettings.ApiKey);</span>
+}</pre>
+        <p class="caption">The key comes from configuration via dependency injection, never from code.</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>Two small changes, but without them nothing else matters: no build, and no data.</li>
+        <li>The compile error looks like a deliberate check. Mention it was fixed first, before any feature work.</li>
+        <li>Red = original lines, green = new lines.</li>
+      </ul>
+    </aside>
+  </section>
+
   <!-- 4. Architecture -->
   <section class="slide">
     <p class="kicker">Architecture</p>
@@ -290,32 +411,41 @@ Client.DefaultRequestHeaders.Authorization =
           <p class="small" style="margin:0">The API sends <code>avgTemp = 0</code> when it has no data. <strong>0 K is absolute zero</strong>, which is physically impossible, so it means "unknown". If 0 were averaged in, the result would be dragged down and misleading.</p>
         </div>
       </div>
-<pre><span class="c">// TemperatureUtility</span>
-<span class="k">public static float?</span> FromApiValue(<span class="k">float</span> kelvin)
-    => kelvin > 0 ? kelvin : (<span class="k">float?</span>)<span class="k">null</span>;
-
-<span class="c">// Planet</span>
-<span class="k">public float?</span> AverageMoonTemperature
+      <div class="stack">
+        <div class="pane before">
+          <div class="pane-head"><span class="tag red">Before</span><span class="file">Planet.cs</span></div>
+<pre><span class="del line"><span class="k">public float</span> AverageMoonGravity</span>
+<span class="del line">{</span>
+<span class="del line">    <span class="k">get</span> => 0.0f;</span>
+<span class="del line">}</span></pre>
+        </div>
+        <div class="pane after">
+          <div class="pane-head"><span class="tag green">After</span><span class="file">Planet.cs</span></div>
+<pre><span class="k">public float?</span> AverageMoonTemperature
 {
     <span class="k">get</span>
     {
         <span class="k">var</span> knownTemperatures = Moons?
-            .Where(m => m.<span class="h">HasKnownTemperature</span>)
-            .Select(m => m.AverageTemperature.Value)
+            .Where(moon => moon.<span class="h">HasKnownTemperature</span>)
+            .Select(moon => moon.AverageTemperature.Value)
             .ToList();
 
-        <span class="k">if</span> (knownTemperatures == <span class="k">null</span>
-            || knownTemperatures.Count == 0)
-            <span class="k">return null</span>;   <span class="c">// "unknown", not 0</span>
+        <span class="k">if</span> (knownTemperatures == <span class="k">null</span> || knownTemperatures.Count == 0)
+        {
+            <span class="k">return null</span>;
+        }
 
         <span class="k">return</span> knownTemperatures.Average();
     }
 }</pre>
+        </div>
+      </div>
     </div>
     <aside class="notes">
       <ul>
         <li>The PDF pointed at the planet's average method as a starting point. I kept the logic there, because averaging is a domain rule, not a display concern.</li>
-        <li>Nullable is the key decision: "no data" and "zero" must be different things.</li>
+        <li>Before: a stub that always returned 0 and was named after gravity, not temperature. After: a real average over the moons that have data.</li>
+        <li>Nullable is the key decision: "no data" and "zero" must be different things. TemperatureUtility turns the API's 0 K into null.</li>
         <li>The moon count is there so the reader can judge how much an average is worth.</li>
       </ul>
     </aside>
@@ -351,6 +481,105 @@ Client.DefaultRequestHeaders.Authorization =
         <li>~915 for the original code (once it builds and has a key): 1 planet call plus 456 moon calls, done for each of the 2 lists that read planets, plus 1 moon list call.</li>
         <li>Fewer calls means faster runs, less load on a free public API, and fewer chances to fail partway.</li>
         <li>I verified each query change against live responses before changing the code.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 7b. Before/after: loading moons -->
+  <section class="slide">
+    <p class="kicker">Before → After</p>
+    <h2>Loading the moons</h2>
+    <div class="compare" style="flex:1;min-height:0">
+      <div class="pane before">
+        <div class="pane-head"><span class="tag red">Before</span><span class="file">PlanetService.GetAllPlanets()</span></div>
+<pre style="font-size:11.5px"><span class="k">foreach</span> (<span class="k">var</span> planet <span class="k">in</span> results.Bodies)
+{
+    <span class="k">if</span>(planet.Moons != <span class="k">null</span>)
+    {
+        <span class="k">var</span> newMoonsCollection = <span class="k">new</span> Collection&lt;MoonDto&gt;();
+<span class="del line">        <span class="k">foreach</span> (<span class="k">var</span> moon <span class="k">in</span> planet.Moons)</span>
+<span class="del line">        {</span>
+<span class="del line">            <span class="k">var</span> moonResponse = _httpClientService.Client</span>
+<span class="del line">                .GetAsync(UriPath.GetMoonByIdQueryParameters + moon.URLId)</span>
+<span class="del line">                .Result;</span>
+<span class="del line">            <span class="k">var</span> moonContent =</span>
+<span class="del line">                moonResponse.Content.ReadAsStringAsync().Result;</span>
+<span class="del line">            newMoonsCollection.Add(</span>
+<span class="del line">                JsonConvert.DeserializeObject&lt;MoonDto&gt;(moonContent));</span>
+<span class="del line">        }</span>
+        planet.Moons = newMoonsCollection;
+    }
+    allPlanetsWithTheirMoons.Add(<span class="k">new</span> Planet(planet));
+}</pre>
+        <p class="caption"><b>One blocking request per moon</b> (456), no status check, and the whole method ran again for each list that reads planets.</p>
+      </div>
+      <div class="pane after">
+        <div class="pane-head"><span class="tag green">After</span><span class="file">PlanetService.GetAllPlanets()</span></div>
+<pre style="font-size:11.5px"><span class="add line"><span class="k">if</span> (_cachedPlanets != <span class="k">null</span>) <span class="k">return</span> _cachedPlanets;</span>
+
+<span class="k">var</span> results = _httpClientService
+    .GetFromJson&lt;JsonResult&lt;PlanetDto&gt;&gt;(
+        UriPath.GetAllPlanetsWithMoonsQueryParameters);
+<span class="k">var</span> planetDtos = results?.Bodies ?? Enumerable.Empty&lt;PlanetDto&gt;();
+
+<span class="c">//All moons come from ONE bulk request.</span>
+<span class="add line"><span class="k">var</span> moonsById = _moonService.GetAllMoons()</span>
+<span class="add line">    .GroupBy(moon => moon.Id, StringComparer.OrdinalIgnoreCase)</span>
+<span class="add line">    .ToDictionary(group => group.Key, group => group.First(),</span>
+<span class="add line">                  StringComparer.OrdinalIgnoreCase);</span>
+
+_cachedPlanets = planetDtos
+    .Where(planetDto => planetDto != <span class="k">null</span>)
+    .Select(planetDto => <span class="k">new</span> Planet(planetDto,
+        <span class="add">ResolveMoons(planetDto, moonsById)</span>))
+    .ToList()
+    .AsReadOnly();</pre>
+        <p class="caption"><b>Moons looked up in memory</b> by id. Planets and moons are loaded once per run and reused.</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>Left: for Saturn alone that is 293 sequential HTTP calls, done twice per run.</li>
+        <li>Right: MoonService makes one bulk call, and ResolveMoons matches each planet's moon references (by the id in their URL) to that list.</li>
+        <li>Moons the lookup can't find are kept and logged, so the counts still match what the API says.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 7c. Before/after: queries -->
+  <section class="slide">
+    <p class="kicker">Before → After</p>
+    <h2>The API queries</h2>
+    <div class="stack">
+      <div class="pane before">
+        <div class="pane-head"><span class="tag red">Before</span><span class="file">UriPath.cs</span></div>
+<pre style="font-size:13px">GetAllPlanetsWithMoonsQueryParameters =
+    BodiesUri + <span class="s">"?data=id,<span class="del">semiMajorAxis</span>,moons,moon,rel&amp;filter[]=isPlanet,neq,false"</span>;
+
+GetAllMoonsWithMassQueryParameters = BodiesUri +
+    <span class="s">"?data=id,mass,massValue,massExponent,massValue&amp;filter[]=<span class="del">aroundPlanet,gt,null</span>"</span>;
+
+<span class="del line">GetMoonByIdQueryParameters = BodiesUri + <span class="s">"/"</span>;</span></pre>
+      </div>
+      <div class="pane after">
+        <div class="pane-head"><span class="tag green">After</span><span class="file">UriPath.cs</span></div>
+<pre style="font-size:13px">GetAllPlanetsWithMoonsQueryParameters =
+    BodiesUri + <span class="s">"?data=id,<span class="add">semimajorAxis</span>,<span class="add">avgTemp</span>,moons,moon,rel&amp;filter[]=isPlanet,neq,false"</span>;
+
+GetAllMoonsQueryParameters = BodiesUri +
+    <span class="s">"?data=id,mass,massValue,massExponent,<span class="add">avgTemp,aroundPlanet,planet</span>&amp;filter[]=<span class="add">bodyType,eq,Moon</span>"</span>;</pre>
+      </div>
+    </div>
+    <table class="tight" style="margin-top:14px;font-size:15px">
+      <tr><td style="width:34%"><code>semiMajorAxis</code> → <code>semimajorAxis</code></td><td class="muted">Field names are case-sensitive: the value was always 0</td></tr>
+      <tr><td><code>aroundPlanet,gt,null</code> → <code>bodyType,eq,Moon</code></td><td class="muted">336 → <strong>479</strong> moons</td></tr>
+      <tr><td>+ <code>avgTemp</code>, <code>aroundPlanet</code>, <code>planet</code></td><td class="muted">Temperature and parent planet, in the same request</td></tr>
+      <tr><td><code>GetMoonByIdQueryParameters</code> removed</td><td class="muted">No per-moon requests any more</td></tr>
+    </table>
+    <aside class="notes">
+      <ul>
+        <li>All four changes were found by comparing real API responses, not by reading the code.</li>
+        <li>Nested fields like "planet" inside aroundPlanet must be listed in data=, otherwise the API returns an empty object.</li>
       </ul>
     </aside>
   </section>
@@ -420,13 +649,36 @@ Client.DefaultRequestHeaders.Authorization =
 
   <!-- 10. Sample output -->
   <section class="slide">
-    <p class="kicker">Result</p>
-    <h2>The new list</h2>
-<pre class="term">Loading data from the Solar System OpenData API...
-Data loaded: 8 planets and 479 moons.
-
-Writing the planets with moons and their average moon temperature...
---------------------+---------------+------------------------------+------------------------------+------------------------------
+    <p class="kicker">Before → After</p>
+    <h2>The output</h2>
+    <div class="out-top">
+    <div class="pane before">
+      <div class="pane-head"><span class="tag red">Before</span><span class="file">original, once it builds and has a key</span></div>
+<pre class="term sm">--------------------+------------------------------
+Planet's Id         |The Planet's Average Moon Gravity
+--------------------+------------------------------
+uranus              |0
+neptune             |0
+jupiter             |0
+mars                |0
+<span class="del">mercure             |-</span>
+saturne             |0
+terre               |0
+<span class="del">venus               |-</span>
+--------------------+------------------------------</pre>
+    </div>
+    <div style="padding-top:34px">
+      <ul class="small">
+        <li><strong>Every value</strong> was a hard-coded <code>0</code> from the gravity stub</li>
+        <li>Planets <strong>without moons</strong> were listed too, with "-"</li>
+        <li>Ids were not title-cased (<code>uranus</code>)</li>
+        <li class="muted">As shipped it didn't build; once built but without a key, this list printed only "No moons found."</li>
+      </ul>
+    </div>
+    </div>
+    <div class="pane after">
+      <div class="pane-head"><span class="tag green">After</span><span class="file">dotnet run</span></div>
+<pre class="term sm">--------------------+---------------+------------------------------+------------------------------+------------------------------
 Planet's Id         |Total Moons    |Moons With Temperature Data   |Average Moon Temperature      |Planet's Average Temperature
 --------------------+---------------+------------------------------+------------------------------+------------------------------
 Uranus              |29             |0                             |n/a                           |76.0 K / -197.1 C
@@ -436,17 +688,12 @@ Mars                |2              |0                             |n/a         
 Saturne             |293            |0                             |n/a                           |134.0 K / -139.1 C
 Terre               |1              |0                             |n/a                           |288.0 K / 14.9 C
 --------------------+---------------+------------------------------+------------------------------+------------------------------
-<span class="h">Note: the API reports no temperature (avgTemp = 0 K) for any of these moons, so their average is shown as n/a.</span>
-
-Writing the lists to CSV files...
-The file is created in: ...\FileOutput\AllPlanetsAndTheirAverageMoonTemperature.csv
-The file is created in: ...\FileOutput\AllMoonsAndTheirMass.csv
-The file is created in: ...\FileOutput\AllPlanetsAndTheirMoons.csv
-<span class="g">Done.</span></pre>
-    <p class="muted small" style="margin-top:14px">Mercury and Venus are left out: no moons. Planet ids are the API's French ids (Terre, Saturne).</p>
+<span class="h">Note: the API reports no temperature (avgTemp = 0 K) for any of these moons, so their average is shown as n/a.</span></pre>
+    </div>
     <aside class="notes">
       <ul>
-        <li>Walk the columns left to right: the count column explains the n/a.</li>
+        <li>Before is what the original code would print once fixed to build and given a key: the gravity stub returns 0 for every planet.</li>
+        <li>After: only planets with moons, and every column explains itself. The count column explains the n/a. Planet ids are the API's French ids (Terre, Saturne).</li>
         <li>The two existing lists (moons with mass, planets with moons) still run, now with all 479 moons and real semi-major axis values.</li>
       </ul>
     </aside>
