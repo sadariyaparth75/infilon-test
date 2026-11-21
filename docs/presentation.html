@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar System Console App – TenForce Test &amp; Taste</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a33;
+    --panel-2: #18213f;
+    --line: #26304f;
+    --text: #e7eaf3;
+    --muted: #9aa3bb;
+    --sun: #f5a524;
+    --teal: #4fd1c5;
+    --red: #ff7a7a;
+    --green: #6fdc8c;
+    --mono: "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05080f; color: var(--text); font-family: var(--sans); overflow: hidden; }
+
+  /* The stage is a fixed 1280x720 canvas, scaled to fit the window. */
+  #stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; transform-origin: center center; }
+  .slide {
+    position: absolute; inset: 0; padding: 56px 72px 64px; background: var(--bg);
+    display: none; flex-direction: column; overflow: hidden;
+    background-image: radial-gradient(circle at 92% 8%, rgba(245,165,36,.10), transparent 32%);
+  }
+  .slide.active { display: flex; }
+
+  .kicker { font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--sun); font-weight: 600; margin: 0 0 10px; }
+  h1 { font-size: 60px; line-height: 1.05; margin: 0 0 18px; font-weight: 700; letter-spacing: -.01em; }
+  h2 { font-size: 40px; line-height: 1.1; margin: 0 0 26px; font-weight: 700; letter-spacing: -.01em; }
+  h3 { font-size: 20px; margin: 0 0 10px; color: var(--teal); font-weight: 600; }
+  p, li { font-size: 21px; line-height: 1.45; color: var(--text); }
+  p { margin: 0 0 14px; }
+  ul { margin: 0; padding-left: 24px; }
+  li { margin: 0 0 9px; }
+  li::marker { color: var(--sun); }
+  .muted { color: var(--muted); }
+  .small, .small li { font-size: 17px; }
+  strong { color: #fff; }
+  /* No ligatures: code must show "<=", "=>" and "..." exactly as typed. */
+  pre, code { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+  code { font-family: var(--mono); font-size: .88em; background: var(--panel-2); padding: 1px 6px; border-radius: 4px; color: #ffd48a; }
+
+  pre {
+    font-family: var(--mono); font-size: 15px; line-height: 1.5; margin: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; overflow: hidden;
+    color: #d7dcea; white-space: pre;
+  }
+  pre .c { color: #6f7a96; }       /* comment */
+  pre .k { color: #8fb7ff; }       /* keyword */
+  pre .s { color: #ffd48a; }       /* string */
+  pre .h { color: var(--sun); }    /* highlight */
+  pre .g { color: var(--green); }
+  pre .r { color: var(--red); }
+  pre.term { background: #070b16; font-size: 12.5px; line-height: 1.4; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .stat { text-align: center; padding: 34px 22px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  .card p, .card li { font-size: 18px; }
+  .card.bad { border-color: rgba(255,122,122,.45); }
+  .card.good { border-color: rgba(111,220,140,.45); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 18px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.35; }
+  th { color: var(--muted); font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; }
+  td.num { color: var(--sun); font-weight: 700; white-space: nowrap; }
+
+  .big { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+  .big.red { color: var(--red); }
+  .big.green { color: var(--green); }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; margin-bottom: 12px; }
+  .tag.red { background: rgba(255,122,122,.15); color: var(--red); }
+  .tag.green { background: rgba(111,220,140,.15); color: var(--green); }
+  .tag.sun { background: rgba(245,165,36,.15); color: var(--sun); }
+
+  /* Architecture diagram */
+  .arch { display: grid; grid-template-columns: 1fr 300px; gap: 26px; flex: 1; }
+  .layers { display: flex; flex-direction: column; gap: 10px; }
+  .layer { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  .layer .name { font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; }
+  .layer .boxes { display: flex; gap: 10px; flex-wrap: wrap; }
+  .box { font-family: var(--mono); font-size: 15px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+  .layer.api { border-style: dashed; border-color: var(--sun); }
+  .arrow { text-align: center; color: var(--sun); font-size: 18px; line-height: 1; margin: -4px 0; padding-left: 186px; text-align: left; }
+  .side { display: flex; flex-direction: column; gap: 10px; }
+
+  .title-slide { justify-content: center; }
+  .title-slide h1 { font-size: 72px; max-width: 900px; }
+  .sun-orb { position: absolute; right: -120px; top: 50%; width: 520px; height: 520px; transform: translateY(-50%); border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffd27a, #f5a524 45%, #c46a00 75%, transparent 76%); opacity: .9; box-shadow: 0 0 140px rgba(245,165,36,.35); }
+  .orbit { position: absolute; right: -360px; top: 50%; width: 1000px; height: 1000px; transform: translateY(-50%); border: 1px dashed rgba(231,234,243,.12); border-radius: 50%; }
+  .meta { display: flex; gap: 36px; margin-top: 36px; }
+  .meta div { font-size: 17px; color: var(--muted); }
+  .meta b { display: block; color: var(--text); font-size: 20px; font-weight: 600; margin-top: 4px; }
+
+  .footer { position: absolute; left: 72px; right: 72px; bottom: 22px; display: flex; justify-content: space-between; font-size: 13px; color: #5d6782; }
+
+  /* Progress bar + controls */
+  #progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--sun); transition: width .2s ease; z-index: 5; }
+  #controls { position: fixed; right: 14px; bottom: 12px; display: flex; gap: 6px; z-index: 6; opacity: .25; transition: opacity .2s; }
+  #controls:hover { opacity: 1; }
+  #controls button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font: 14px var(--sans); cursor: pointer; }
+  #help { position: fixed; left: 14px; bottom: 12px; font-size: 12px; color: #4b5470; z-index: 6; }
+
+  /* Speaker notes panel (press N) */
+  #notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 38vh; overflow: auto; background: rgba(12,17,34,.97); border-top: 2px solid var(--sun);
+    padding: 16px 28px 28px; font-size: 17px; line-height: 1.5; color: var(--text); z-index: 10; }
+  #notes h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--sun); }
+  #notes ul { padding-left: 20px; margin: 0; }
+  #notes li { font-size: 17px; margin-bottom: 4px; }
+  aside.notes { display: none; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <!-- 1. Title -->
+  <section class="slide title-slide">
+    <div class="orbit"></div>
+    <div class="sun-orb"></div>
+    <p class="kicker">TenForce · Test &amp; Taste</p>
+    <h1>Solar System<br>Console App</h1>
+    <p class="muted" style="font-size:24px;max-width:720px">Extending an existing .NET console app with the average moon temperature for every planet that has moons.</p>
+    <div class="meta">
+      <div>Presented by<b>Parth S.</b></div>
+      <div>Branch<b>TenForce-ParthS</b></div>
+      <div>Stack<b>C# · .NET 10 · REST API</b></div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>Thank them for the assignment. Plan: what was asked, what I found, what I changed and why, a live demo, then questions.</li>
+        <li>About 15 minutes, with time for questions at the end.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 2. The assignment -->
+  <section class="slide">
+    <p class="kicker">The assignment</p>
+    <h2>What was asked</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>The feature</h3>
+        <ul>
+          <li>List all planets that have <strong>at least one moon</strong></li>
+          <li>Show the <strong>average temperature of their moons</strong></li>
+          <li>Explain the changes to the <strong>domain model</strong> and the <strong>API interface</strong></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Around the feature</h3>
+        <ul>
+          <li>Send the API key as a <code>Bearer</code> token, read from <strong>configuration</strong>, never from code</li>
+          <li>README that explains how to set the key</li>
+          <li>Separate data access, data objects and data handling</li>
+          <li>Comments, error handling, progress messages</li>
+          <li>Git: <code>main</code> plus a <code>TenForce-ParthS</code> branch</li>
+        </ul>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>The app reads the Solar System OpenData API and writes lists to the console and to a file.</li>
+        <li>The core task is one new list, but the PDF also asks me to justify my model and API changes, and that is most of the talk.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 3. Starting point -->
+  <section class="slide">
+    <p class="kicker">Starting point</p>
+    <h2>What I found in the existing code</h2>
+    <table>
+      <tr><th style="width:38%">Finding</th><th>Impact</th></tr>
+      <tr><td><strong>Did not compile</strong></td><td class="muted">Syntax error <code>$""{...}""</code> in <code>Program.cs</code>, so the project <strong>could not build</strong></td></tr>
+      <tr><td><strong>No <code>Authorization</code> header</strong></td><td class="muted">Since API v2.0.0 every request is rejected, so <strong>every list came out empty</strong></td></tr>
+      <tr><td>No temperature anywhere</td><td class="muted"><code>AverageMoonGravity</code> stub always returned <code>0</code></td></tr>
+      <tr><td>One HTTP request per moon</td><td class="muted">Hundreds of blocking calls, repeated for both lists that read planets</td></tr>
+      <tr><td>Filter <code>aroundPlanet,gt,null</code></td><td class="muted">Quietly returned only 336 of the 479 moons</td></tr>
+      <tr><td><code>semiMajorAxis</code> in the query</td><td class="muted">Field is really <code>semimajorAxis</code>, so the value was always <code>0</code></td></tr>
+      <tr><td>No file output, target <code>net5.0</code></td><td class="muted">File output described (file names already in <code>PathName</code>) but missing; .NET 5 is out of support</td></tr>
+    </table>
+    <aside class="notes">
+      <ul>
+        <li>Before writing the feature, I read the code end to end and checked the API with real requests.</li>
+        <li>The first two rows mattered most: the project couldn't build, and even once built, the API rejected every request, so nothing could be shown.</li>
+        <li>The compile error looks like a deliberate check. Say that it was the first thing fixed, before any feature work.</li>
+        <li>The filter and casing issues only showed up by comparing API responses, not by reading the code.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 4. Architecture -->
+  <section class="slide">
+    <p class="kicker">Architecture</p>
+    <h2>Clear layers, one direction</h2>
+    <div class="arch">
+      <div class="layers">
+        <div class="layer"><span class="name">Entry point</span><div class="boxes"><span class="box">Program.cs</span><span class="muted" style="font-size:16px">config · DI · 3 steps</span></div></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><span class="name">Output</span><div class="boxes"><span class="box">ScreenOutputService</span><span class="box">FileOutputService</span></div></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><span class="name">Data handling</span><div class="boxes"><span class="box">PlanetService</span><span class="box">MoonService</span><span class="muted" style="font-size:16px">cache · join moons</span></div></div>
+        <div class="arrow">▼</div>
+        <div class="layer"><span class="name">Data access</span><div class="boxes"><span class="box">HttpClientService</span><span class="muted" style="font-size:16px">auth header · errors</span></div></div>
+        <div class="arrow">▼</div>
+        <div class="layer api"><span class="name">External</span><div class="boxes"><span class="box">api.le-systeme-solaire.net</span></div></div>
+      </div>
+      <div class="side">
+        <div class="card"><h3>Data objects</h3><p class="small" style="margin:0"><code>Planet</code>, <code>Moon</code>: domain logic like the average</p></div>
+        <div class="card"><h3>DTOs</h3><p class="small" style="margin:0"><code>PlanetDto</code>, <code>MoonDto</code>: the API's JSON shape</p></div>
+        <div class="card"><h3>Configuration</h3><p class="small" style="margin:0"><code>ApiSettings</code>: resolves the key</p></div>
+        <div class="card"><h3>Utilities</h3><p class="small" style="margin:0">Console &amp; CSV writers, logger, temperature</p></div>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>This is a console app that <em>consumes</em> an external API. It does not host one.</li>
+        <li>Each layer only talks to the one below it, and everything is wired with dependency injection.</li>
+        <li>DTOs mirror the JSON; domain objects hold the logic. The average lives in Planet, not in the output code.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 5. API key -->
+  <section class="slide">
+    <p class="kicker">Authentication</p>
+    <h2>API key: from configuration, never from code</h2>
+    <div class="grid-2">
+      <div>
+        <ul>
+          <li><strong>Three sources, first one wins:</strong> environment variable, .NET user secrets, <code>appsettings.json</code></li>
+          <li><code>appsettings.json</code> is in <code>.gitignore</code>; the repo has only <code>appsettings.example.json</code> as a template</li>
+          <li><strong>Fails fast:</strong> no key means a clear instruction and exit code 1, instead of silently empty lists</li>
+          <li><strong>Rejected key</strong> (401 / 403) gets its own message</li>
+          <li class="muted small">Found while testing: the API answers an <em>invalid</em> key with <strong>403</strong>, not the 401 mentioned in the PDF</li>
+        </ul>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+<pre><span class="c">// Program.cs: later sources override earlier ones</span>
+<span class="k">new</span> ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile(<span class="s">"appsettings.json"</span>, optional: <span class="k">true</span>)
+    .AddUserSecrets&lt;Program&gt;(optional: <span class="k">true</span>)
+    .Build();
+
+<span class="c">// ApiSettings: the environment variable wins</span>
+<span class="k">var</span> apiKey = Environment.GetEnvironmentVariable(
+    <span class="s">"SOLAR_SYSTEM_API_KEY"</span>);
+<span class="k">if</span> (string.IsNullOrWhiteSpace(apiKey))
+    apiKey = configuration[<span class="s">"SOLAR_SYSTEM_API_KEY"</span>];</pre>
+<pre><span class="c">// HttpClientService constructor</span>
+Client.DefaultRequestHeaders.Authorization =
+    <span class="k">new</span> AuthenticationHeaderValue(
+        <span class="s">"Bearer"</span>, <span class="h">apiSettings.ApiKey</span>);</pre>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>The environment variable wins, so a key can be overridden per run (for example in CI) without touching stored secrets.</li>
+        <li>appsettings.json is the simplest option and one the PDF names explicitly: "an appsettings file excluded via .gitignore". User secrets and the environment variable stay available.</li>
+        <li>You can run it with your own key: copy the example file and paste your key in. The README shows how.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 6. Domain model -->
+  <section class="slide">
+    <p class="kicker">Domain model changes</p>
+    <h2>Temperature as a first-class, <em>nullable</em> value</h2>
+    <div class="grid-2">
+      <div>
+        <ul class="small">
+          <li><code>Moon.AverageTemperature</code>: <code>float?</code> in Kelvin</li>
+          <li><code>Planet.AverageMoonTemperature</code> replaces the <code>AverageMoonGravity</code> stub</li>
+          <li><code>Planet.MoonsWithKnownTemperatureCount</code>: how many moons the average is based on</li>
+          <li><code>Planet.AverageTemperature</code>: the planet's own value, as a reference</li>
+        </ul>
+        <div class="card" style="margin-top:18px">
+          <h3>Why nullable?</h3>
+          <p class="small" style="margin:0">The API sends <code>avgTemp = 0</code> when it has no data. <strong>0 K is absolute zero</strong>, which is physically impossible, so it means "unknown". If 0 were averaged in, the result would be dragged down and misleading.</p>
+        </div>
+      </div>
+<pre><span class="c">// TemperatureUtility</span>
+<span class="k">public static float?</span> FromApiValue(<span class="k">float</span> kelvin)
+    => kelvin > 0 ? kelvin : (<span class="k">float?</span>)<span class="k">null</span>;
+
+<span class="c">// Planet</span>
+<span class="k">public float?</span> AverageMoonTemperature
+{
+    <span class="k">get</span>
+    {
+        <span class="k">var</span> knownTemperatures = Moons?
+            .Where(m => m.<span class="h">HasKnownTemperature</span>)
+            .Select(m => m.AverageTemperature.Value)
+            .ToList();
+
+        <span class="k">if</span> (knownTemperatures == <span class="k">null</span>
+            || knownTemperatures.Count == 0)
+            <span class="k">return null</span>;   <span class="c">// "unknown", not 0</span>
+
+        <span class="k">return</span> knownTemperatures.Average();
+    }
+}</pre>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>The PDF pointed at the planet's average method as a starting point. I kept the logic there, because averaging is a domain rule, not a display concern.</li>
+        <li>Nullable is the key decision: "no data" and "zero" must be different things.</li>
+        <li>The moon count is there so the reader can judge how much an average is worth.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 7. API interface -->
+  <section class="slide">
+    <p class="kicker">API interface changes</p>
+    <h2>From hundreds of requests to two</h2>
+    <div class="grid-2" style="grid-template-columns: 1fr 1fr 1.25fr">
+      <div class="card bad stat">
+        <span class="tag red">Before</span>
+        <div class="big red">~915</div>
+        <p class="muted small" style="margin-top:10px">1 planet list + 1 request per moon, run again for each of 2 output lists, + 1 moon list</p>
+      </div>
+      <div class="card good stat">
+        <span class="tag green">After</span>
+        <div class="big green">2</div>
+        <p class="muted small" style="margin-top:10px">1 planet list + 1 bulk moon list, loaded once and reused for every output</p>
+      </div>
+      <div>
+        <ul class="small">
+          <li><strong>Bulk moon request</strong> with <code>avgTemp</code> and <code>aroundPlanet</code>; moons are matched to planets in memory by id</li>
+          <li><code>bodyType,eq,Moon</code> instead of <code>aroundPlanet,gt,null</code>: <strong>479</strong> moons instead of 336</li>
+          <li>Nested fields listed explicitly in <code>data=</code>, otherwise the API returns empty objects</li>
+          <li><code>semimajorAxis</code> spelled the way the API spells it</li>
+          <li>One <code>GetFromJson&lt;T&gt;</code> helper: status checks, clear errors</li>
+        </ul>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>~915 for the original code (once it builds and has a key): 1 planet call plus 456 moon calls, done for each of the 2 lists that read planets, plus 1 moon list call.</li>
+        <li>Fewer calls means faster runs, less load on a free public API, and fewer chances to fail partway.</li>
+        <li>I verified each query change against live responses before changing the code.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 8. The data finding -->
+  <section class="slide">
+    <p class="kicker">An honest result</p>
+    <h2>The API has no moon temperatures</h2>
+    <div class="grid-2">
+      <div>
+        <p>All <strong>479 moons</strong> return <code>avgTemp = 0</code>. I checked the list endpoint and individual moons (Lune, Titan, Europe, Triton, Io).</p>
+        <p><strong>So every moon average is "n/a".</strong> The output makes that visible instead of hiding it:</p>
+        <ul class="small">
+          <li>"Moons With Temperature Data" column shows <code>0</code></li>
+          <li>A note under the table explains why</li>
+          <li>The planet's own temperature is shown <em>separately</em>, not substituted</li>
+          <li>When the dataset gains moon temperatures, the averages appear <strong>with no code change</strong></li>
+        </ul>
+      </div>
+      <div class="card" style="align-self:start">
+        <span class="tag sun">Decision</span>
+        <h3 style="color:var(--text)">Why not estimate a value?</h3>
+        <p class="small">Filling the gap with the planet's temperature would print numbers that look real but aren't. In a data tool, a visible "unknown" is more useful than a confident wrong value.</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>This is a data limitation, not a code limitation. The calculation is in place and handles the case correctly.</li>
+        <li>If asked: yes, I could approximate, but I'd make it opt-in and clearly labelled as an estimate.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 9. Error handling & feedback -->
+  <section class="slide">
+    <p class="kicker">Robustness</p>
+    <h2>Error handling and user feedback</h2>
+    <div class="grid-3">
+      <div class="card">
+        <span class="tag sun">Step 1</span>
+        <h3>Load data</h3>
+        <p>"Loading data…" then a summary line with counts. <strong>On failure the run stops</strong>, because there is nothing to write.</p>
+      </div>
+      <div class="card">
+        <span class="tag sun">Step 2</span>
+        <h3>Write to screen</h3>
+        <p>A step message before each list. A failure here is reported, but <strong>does not block step 3</strong>.</p>
+      </div>
+      <div class="card">
+        <span class="tag sun">Step 3</span>
+        <h3>Write to files</h3>
+        <p>Three CSV files in <code>FileOutput/</code>. Each folder and file created is announced on screen.</p>
+      </div>
+    </div>
+    <ul class="small" style="margin-top:26px">
+      <li>Failed requests throw a clear error instead of returning an empty list that looks like "no planets found"</li>
+      <li>log4net logs warnings and errors with stack traces; any failure sets <strong>exit code 1</strong></li>
+      <li>Invalid API entries (null, no id) are skipped safely; unmatched moons are logged</li>
+    </ul>
+    <aside class="notes">
+      <ul>
+        <li>The original code returned an empty list on errors, so a missing or wrong key looked exactly like "the API has no planets". Now it says what went wrong.</li>
+        <li>The exit code matters if this ever runs in a script or a scheduled job.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 10. Sample output -->
+  <section class="slide">
+    <p class="kicker">Result</p>
+    <h2>The new list</h2>
+<pre class="term">Loading data from the Solar System OpenData API...
+Data loaded: 8 planets and 479 moons.
+
+Writing the planets with moons and their average moon temperature...
+--------------------+---------------+------------------------------+------------------------------+------------------------------
+Planet's Id         |Total Moons    |Moons With Temperature Data   |Average Moon Temperature      |Planet's Average Temperature
+--------------------+---------------+------------------------------+------------------------------+------------------------------
+Uranus              |29             |0                             |n/a                           |76.0 K / -197.1 C
+Neptune             |16             |0                             |n/a                           |55.0 K / -218.1 C
+Jupiter             |115            |0                             |n/a                           |165.0 K / -108.1 C
+Mars                |2              |0                             |n/a                           |210.0 K / -63.1 C
+Saturne             |293            |0                             |n/a                           |134.0 K / -139.1 C
+Terre               |1              |0                             |n/a                           |288.0 K / 14.9 C
+--------------------+---------------+------------------------------+------------------------------+------------------------------
+<span class="h">Note: the API reports no temperature (avgTemp = 0 K) for any of these moons, so their average is shown as n/a.</span>
+
+Writing the lists to CSV files...
+The file is created in: ...\FileOutput\AllPlanetsAndTheirAverageMoonTemperature.csv
+The file is created in: ...\FileOutput\AllMoonsAndTheirMass.csv
+The file is created in: ...\FileOutput\AllPlanetsAndTheirMoons.csv
+<span class="g">Done.</span></pre>
+    <p class="muted small" style="margin-top:14px">Mercury and Venus are left out: no moons. Planet ids are the API's French ids (Terre, Saturne).</p>
+    <aside class="notes">
+      <ul>
+        <li>Walk the columns left to right: the count column explains the n/a.</li>
+        <li>The two existing lists (moons with mass, planets with moons) still run, now with all 479 moons and real semi-major axis values.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 11. Demo -->
+  <section class="slide">
+    <p class="kicker">Live demo</p>
+    <h2>Demo script</h2>
+    <div class="grid-2" style="grid-template-columns: 1.35fr 1fr">
+<pre style="font-size:14px"><span class="c"># 1. Set your own key (file is git-ignored)</span>
+Copy-Item Test-Taste-Console-Application\appsettings.example.json `
+          Test-Taste-Console-Application\appsettings.json
+<span class="c">#    then paste the key into appsettings.json</span>
+
+<span class="c"># 2. Normal run</span>
+dotnet run --project Test-Taste-Console-Application
+
+<span class="c"># 3. Wrong key: handled, exit code 1</span>
+$env:SOLAR_SYSTEM_API_KEY = <span class="s">"00000000-0000-0000-0000-000000000000"</span>
+dotnet run --project Test-Taste-Console-Application
+Remove-Item Env:SOLAR_SYSTEM_API_KEY
+
+<span class="c"># 4. Open the CSV files</span>
+explorer FileOutput</pre>
+      <div>
+        <h3>What to point out</h3>
+        <ul class="small">
+          <li><strong>Run 2:</strong> progress messages, the new table, the n/a note, the CSV paths</li>
+          <li><strong>Run 3:</strong> the environment variable overrides appsettings.json, and the app reports the rejected key clearly</li>
+          <li><strong>CSV:</strong> one row per planet/moon pair; empty cell = unknown temperature</li>
+          <li><strong>Code:</strong> <code>Planet.cs</code>, <code>PlanetService.cs</code>, <code>UriPath.cs</code></li>
+        </ul>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>Run from the repo root. Have the terminal open and the first run done once beforehand, so the build is warm.</li>
+        <li>After step 3, don't forget Remove-Item, or the next run will use the fake key.</li>
+        <li>If the network is down: show the README and the saved output instead.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 12. Trade-offs & next steps -->
+  <section class="slide">
+    <p class="kicker">Reflection</p>
+    <h2>Trade-offs and next steps</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Deliberate trade-offs</h3>
+        <ul class="small">
+          <li><strong>Synchronous calls:</strong> with only 2 requests, async through every layer added little. It's the first thing to change if calls grow.</li>
+          <li><strong>In-memory cache</strong> per run, not on disk</li>
+          <li><strong>Existing structure kept</strong> (log4net, Newtonsoft, console writer), so changes stay reviewable</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>With more time</h3>
+        <ul class="small">
+          <li>Unit tests for the averaging and the moon matching</li>
+          <li>Async/await end to end, with retry on network errors (Polly)</li>
+          <li>Sort planets by distance from the Sun, and show English names (<code>englishName</code>)</li>
+          <li>Shared table model for screen and CSV, to remove duplication</li>
+        </ul>
+      </div>
+    </div>
+    <aside class="notes">
+      <ul>
+        <li>The PDF says the aim isn't complex optimised code but how I solve problems, so I focused on correctness, honesty about the data, and clear reasoning.</li>
+        <li>Be ready to defend sync vs async: a simple choice for a 2-request console app, with a clear path to change it.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- 13. Questions -->
+  <section class="slide title-slide">
+    <div class="orbit"></div>
+    <div class="sun-orb"></div>
+    <p class="kicker">Thank you</p>
+    <h1>Questions?</h1>
+    <ul style="max-width:720px">
+      <li>Builds and runs again: compile error fixed, API key sent</li>
+      <li>Feature: planets with moons and their average moon temperature</li>
+      <li>2 API requests instead of ~915; 479 moons instead of 336</li>
+      <li>Key from configuration; README explains setup</li>
+      <li>Honest output when the data is missing</li>
+    </ul>
+    <aside class="notes">
+      <ul>
+        <li>Recap in one sentence: working feature, faster and more complete data, safe key handling, honest about data gaps.</li>
+      </ul>
+    </aside>
+  </section>
+
+</div>
+
+<div id="progress"></div>
+<div id="help">← → navigate · N notes · F fullscreen</div>
+<div id="controls">
+  <button id="prev" type="button" aria-label="Previous slide">←</button>
+  <button id="counter" type="button" aria-label="Slide number" disabled></button>
+  <button id="next" type="button" aria-label="Next slide">→</button>
+</div>
+<div id="notes" hidden></div>
+
+<script>
+  (function () {
+    var stage = document.getElementById('stage');
+    var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var notesPanel = document.getElementById('notes');
+    var counter = document.getElementById('counter');
+    var progress = document.getElementById('progress');
+    var current = 0;
+
+    // Scale the 1280x720 stage to fit the window, keeping 16:9.
+    function fit() {
+      var scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+      stage.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+    }
+
+    function show(index) {
+      current = Math.max(0, Math.min(slides.length - 1, index));
+      slides.forEach(function (slide, i) { slide.classList.toggle('active', i === current); });
+      counter.textContent = (current + 1) + ' / ' + slides.length;
+      progress.style.width = ((current + 1) / slides.length * 100) + '%';
+      var notes = slides[current].querySelector('aside.notes');
+      notesPanel.innerHTML = '<h4>Speaker notes · slide ' + (current + 1) + '</h4>' + (notes ? notes.innerHTML : '<p>No notes.</p>');
+      if (location.hash !== '#' + (current + 1)) history.replaceState(null, '', '#' + (current + 1));
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (['ArrowRight', 'PageDown', ' ', 'Enter'].indexOf(e.key) >= 0) { e.preventDefault(); show(current + 1); }
+      else if (['ArrowLeft', 'PageUp', 'Backspace'].indexOf(e.key) >= 0) { e.preventDefault(); show(current - 1); }
+      else if (e.key === 'Home') show(0);
+      else if (e.key === 'End') show(slides.length - 1);
+      else if (e.key === 'n' || e.key === 'N') notesPanel.hidden = !notesPanel.hidden;
+      else if (e.key === 'f' || e.key === 'F') {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {});
+        else document.exitFullscreen();
+      }
+    });
+
+    document.getElementById('prev').addEventListener('click', function () { show(current - 1); });
+    document.getElementById('next').addEventListener('click', function () { show(current + 1); });
+    window.addEventListener('resize', fit);
+
+    fit();
+    var start = parseInt(location.hash.replace('#', ''), 10);
+    show(isNaN(start) ? 0 : start - 1);
+  })();
+</script>
+</body>
+</html>
