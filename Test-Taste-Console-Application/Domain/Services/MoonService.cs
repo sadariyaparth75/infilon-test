@@ -1,12 +1,10 @@
 ﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using Newtonsoft.Json;
+using System.Linq;
 using Test_Taste_Console_Application.Constants;
 using Test_Taste_Console_Application.Domain.DataTransferObjects;
 using Test_Taste_Console_Application.Domain.DataTransferObjects.JsonObjects;
 using Test_Taste_Console_Application.Domain.Objects;
 using Test_Taste_Console_Application.Domain.Services.Interfaces;
-using Test_Taste_Console_Application.Utilities;
 
 namespace Test_Taste_Console_Application.Domain.Services
 {
@@ -15,6 +13,8 @@ namespace Test_Taste_Console_Application.Domain.Services
     {
         private readonly HttpClientService _httpClientService;
 
+        //The moons are loaded once per run and reused by the output lists and by the planet service.
+        private IReadOnlyCollection<Moon> _cachedMoons;
 
         public MoonService(HttpClientService httpClientService)
         {
@@ -23,32 +23,22 @@ namespace Test_Taste_Console_Application.Domain.Services
 
         public IEnumerable<Moon> GetAllMoons()
         {
-            var response = _httpClientService.Client
-                .GetAsync(UriPath.GetAllMoonsWithMassQueryParameters)
-                .Result;
-
-            //If the status code isn't 200-299, then the function returns an empty collection.
-            if (!response.IsSuccessStatusCode)
+            if (_cachedMoons != null)
             {
-                Logger.Instance.Warn($"{LoggerMessage.GetRequestFailed}{response.StatusCode}");
-                return new Collection<Moon>();
+                return _cachedMoons;
             }
-
-            var content = response.Content.ReadAsStringAsync().Result;
 
             //The JSON converter uses DTO's, that can be found in the DataTransferObjects folder, to deserialize the response content.
-            var allMoons = new Collection<Moon>();
-            var results = JsonConvert.DeserializeObject<JsonResult<MoonDto>>(content);
+            var results = _httpClientService.GetFromJson<JsonResult<MoonDto>>(UriPath.GetAllMoonsQueryParameters);
 
-            //The JSON converter can return a null object. 
-            if (results == null) return new Collection<Moon>();
+            //The JSON converter can return a null object; entries without an id can't be linked to a planet and are skipped.
+            _cachedMoons = (results?.Bodies ?? Enumerable.Empty<MoonDto>())
+                .Where(moonDto => moonDto != null && !string.IsNullOrWhiteSpace(moonDto.Id))
+                .Select(moonDto => new Moon(moonDto))
+                .ToList()
+                .AsReadOnly();
 
-            foreach(MoonDto moonDto in results.Bodies)
-            {
-                allMoons.Add(new Moon(moonDto));
-            }
-
-            return allMoons;
+            return _cachedMoons;
         }
     }
 }
